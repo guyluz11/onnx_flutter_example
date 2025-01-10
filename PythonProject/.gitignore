@@ -1,0 +1,74 @@
+# Python bytecode files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+env/
+.venv/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.tox/
+*.nox/
+*.coverage
+*.hypothesis/
+
+# Django stuff:
+*.log
+*.pot
+*.pyc
+__pycache__
+db.sqlite3
+db.sqlite3-journal
+
+# VSCode settings
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# MacOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# PyCharm
+.idea/
+
+# VS Code settings
+.vscode/
+
+# Local test and debug files
+*.log
+*.bak
