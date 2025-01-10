@@ -25,8 +25,8 @@ class _TextSummarizationState extends State<TextSummarization> {
   void initState() {
     super.initState();
     loadLongT5Session();
-    loadEncoderSession();
-    loadDecoderSession();
+    // loadEncoderSession();
+    // loadDecoderSession();
   }
 
   Future<void> loadLongT5Session() async {
@@ -69,7 +69,7 @@ class _TextSummarizationState extends State<TextSummarization> {
       [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     ];
     List<List<int>> decoderInputIds = [
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      [0]
     ];
 
     OrtValueTensor inputOrt =
@@ -78,62 +78,95 @@ class _TextSummarizationState extends State<TextSummarization> {
         OrtValueTensor.createTensorWithDataList(attentionMask);
     OrtValueTensor decoderInputIdsOrt =
         OrtValueTensor.createTensorWithDataList(decoderInputIds);
-
-    final inputs = {
-      'input_ids': inputOrt,
-      'attention_mask': attentionMaskOrt,
-      'decoder_input_ids': decoderInputIdsOrt,
-    };
-
-    final runOptions = OrtRunOptions();
-    print('Input names');
-    print(session.inputNames);
-    List<OrtValue?>? outputs = await session.runAsync(runOptions, inputs);
-
-    if (outputs == null || outputs.isEmpty) {
-      return null;
-    }
+    OrtRunOptions runOptions = OrtRunOptions();
+    List<int>? outputs = await generateSummery(
+      attentionMaskOrt: attentionMaskOrt,
+      decoderInputIdsOrt: decoderInputIdsOrt,
+      inputOrt: inputOrt,
+      session: session,
+      runOptions: runOptions,
+    );
 
     print(outputs);
-    print('');
 
-    OrtValue? b = outputs[0];
-    if (b == null) {
-      return null;
-    }
-
-    try {
-      List<List<List<double>>> d = b.value as List<List<List<double>>>;
-      print(d.runtimeType);
-      List<List<int>> summaryIds = npArgmax(d);
-      String summeryText = '';
-      // summeryText = encoding.decode(summaryIds[0]);
-
-      print('Summery');
-      print(summeryText);
-      print('');
-    } catch (e) {
-      print(e);
-      return null;
-    }
     inputOrt.release();
     attentionMaskOrt.release();
     decoderInputIdsOrt.release();
     runOptions.release();
-    outputs.forEach((element) {
-      element?.release();
-    });
 
-    print('This is the output');
-    print(outputs);
-
-    return outputs;
+    return null;
     // Post-process the output
     // String summary = _decodeSummary(outputs);
 
     // setState(() {
     //   _summary = summary;
     // });
+  }
+
+  Future<List<int>?> generateSummery({
+    required OrtValueTensor inputOrt,
+    required OrtValueTensor attentionMaskOrt,
+    required OrtValueTensor decoderInputIdsOrt,
+    required OrtSession session,
+    required OrtRunOptions runOptions,
+  }) async {
+    int outputMaxLength = 512;
+    List<OrtValue?>? outputs;
+    List<int> generatedTokens = [0];
+
+    for (int a = 0; a < outputMaxLength; a++) {
+      final inputs = {
+        'input_ids': inputOrt,
+        'attention_mask': attentionMaskOrt,
+        'decoder_input_ids': decoderInputIdsOrt,
+      };
+
+      outputs = await session.runAsync(runOptions, inputs);
+
+      if (outputs == null || outputs.isEmpty) {
+        return null;
+      }
+
+      OrtValue? output0 = outputs[0];
+      if (output0 == null) {
+        return null;
+      }
+      List<List<List<double>>> output0Value =
+          output0.value as List<List<List<double>>>;
+      int summaryIds = npArgmax(output0Value[0][output0Value[0].length - 1]);
+      generatedTokens.add(summaryIds);
+      const tokenizerEosTokenId = 1;
+      if (summaryIds == tokenizerEosTokenId) {
+        break;
+      }
+      decoderInputIdsOrt =
+          OrtValueTensor.createTensorWithDataList([generatedTokens]);
+      // String summeryText = '';
+      // // summeryText = encoding.decode(summaryIds[0]);
+      //
+      // print('Summery');
+      // print(summeryText);
+      // print('');
+
+      outputs.forEach((element) {
+        element?.release();
+      });
+    }
+    return generatedTokens;
+  }
+
+  List<List<int>> npConcatenate(
+      List<List<int>> decoderInputIds, List<List<int>> newToken) {
+    // Ensure both lists are non-empty and have compatible dimensions
+    if (decoderInputIds.isEmpty) {
+      return newToken;
+    }
+
+    for (int i = 0; i < decoderInputIds.length; i++) {
+      decoderInputIds[i].addAll(newToken[i]);
+    }
+
+    return decoderInputIds;
   }
 
   Future<void> flasscoSummarize(String inputText) async {
@@ -214,20 +247,18 @@ class _TextSummarizationState extends State<TextSummarization> {
 //   }
 
   /// Using axis -1
-  List<List<int>> npArgmax(List<List<List<double>>> logits) {
-    List<List<int>> summaryIds = [];
+  int npArgmax(List<double> logits) {
+    int maxIndex = 0;
+    double maxValue = logits[0];
 
-    for (var batch in logits) {
-      List<int> summaryBatch = [];
-      for (var sequence in batch) {
-        // Find the index of the maximum value in the last dimension (axis=-1)
-        int maxIndex =
-            sequence.indexOf(sequence.reduce((a, b) => a > b ? a : b));
-        summaryBatch.add(maxIndex);
+    for (int i = 1; i < logits.length; i++) {
+      if (logits[i] > maxValue) {
+        maxValue = logits[i];
+        maxIndex = i;
       }
-      summaryIds.add(summaryBatch);
     }
-    return summaryIds;
+
+    return maxIndex;
   }
 
   @override
