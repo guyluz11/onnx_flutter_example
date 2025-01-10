@@ -6,51 +6,73 @@ from transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained("pszemraj/long-t5-tglobal-base-16384-book-summary")
 
 # Load the ONNX model
-onnx_model_path = "long_t5.onnx"  # Replace with your ONNX model path
+onnx_model_path = "models/long_t5.onnx"  # Replace with your ONNX model path
 sess = ort.InferenceSession(onnx_model_path)
 
-# Input text
-long_text = "Here is a lot of text I don't want to read ok?"
 
+# Prepare the input text
+GETLONGTEXT = """New York (CNN)When Liana Barrientos was 23 years old, she got married in Westchester County, New York.
+A year later, she got married again in Westchester County, but to a different man and without divorcing her first husband.
+Only 18 days after that marriage, she got hitched yet again. Then, Barrientos declared "I do" five more times, sometimes only within two weeks of each other.
+In 2010, she married once more, this time in the Bronx. In an application for a marriage license, she stated it was her "first and only" marriage.
+Barrientos, now 39, is facing two criminal counts of "offering a false instrument for filing in the first degree," referring to her false statements on the
+2010 marriage license application, according to court documents.
+Prosecutors said the marriages were part of an immigration scam.
+On Friday, she pleaded not guilty at State Supreme Court in the Bronx, according to her attorney, Christopher Wright, who declined to comment further.
+After leaving court, Barrientos was arrested and charged with theft of service and criminal trespass for allegedly sneaking into the New York subway through an emergency exit, said Detective
+Annette Markowski, a police spokeswoman. In total, Barrientos has been married 10 times, with nine of her marriages occurring between 1999 and 2002.
+All occurred either in Westchester County, Long Island, New Jersey or the Bronx. She is believed to still be married to four men, and at one time, she was married to eight men at once, prosecutors say.
+Prosecutors said the immigration scam involved some of her husbands, who filed for permanent residence status shortly after the marriages.
+Any divorces happened only after such filings were approved. It was unclear whether any of the men will be prosecuted.
+The case was referred to the Bronx District Attorney\'s Office by Immigration and Customs Enforcement and the Department of Homeland Security\'s
+Investigation Division. Seven of the men are from so-called "red-flagged" countries, including Egypt, Turkey, Georgia, Pakistan and Mali.
+Her eighth husband, Rashid Rajput, was deported in 2006 to his native Pakistan after an investigation by the Joint Terrorism Task Force.
+If convicted, Barrientos faces up to four years in prison.  Her next court appearance is scheduled for May 18.
+"""
 max_length = 16384  # Maximum length for the model
-
+output_max_length = 512  # Set a reasonable length for the summary
 
 # Tokenize the input text
-inputs = tokenizer(long_text, return_tensors="np", padding=True, truncation=True, max_length=max_length)
+inputs = tokenizer(GETLONGTEXT, return_tensors="np", padding=True, truncation=True, max_length=max_length)
 
 # Prepare inputs for the ONNX model
-input_ids = inputs["input_ids"]
-attention_mask = inputs["attention_mask"]
+input_ids = np.array(inputs["input_ids"], dtype=np.int64)
+attention_mask = np.array(inputs["attention_mask"], dtype=np.int64)
 
-# Convert inputs to the correct format (ONNX Runtime expects numpy arrays)
-input_ids = np.array(input_ids, dtype=np.int64)
-attention_mask = np.array(attention_mask, dtype=np.int64)
+# Initialize the decoder with a starting token (fallback to the pad token if bos_token_id is None)
+start_token_id = tokenizer.bos_token_id or tokenizer.pad_token_id
+decoder_input_ids = np.array([[start_token_id]], dtype=np.int64)  # Begin with the start token
 
+# Iteratively decode the output
+generated_tokens = []
 
-# Prepare decoder_input_ids (usually, we use the <BOS> token as the starting token for the decoder)
-decoder_input_ids = np.full_like(input_ids, tokenizer.pad_token_id)  # Initialize with padding token ID
+for _ in range(output_max_length):
+    # Prepare inputs dictionary for ONNX model
+    onnx_inputs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "decoder_input_ids": decoder_input_ids
+    }
 
-# You can also initialize decoder_input_ids with the <BOS> token (if available)
-# decoder_input_ids[0] = tokenizer.convert_tokens_to_ids("<BOS>")  # Uncomment if <BOS> is available
+    # Run the model
+    outputs = sess.run(None, onnx_inputs)
 
+    # Extract logits and get the most probable next token
+    logits = outputs[0]
+    next_token_id = np.argmax(logits[0, -1])  # Get the last token's prediction
 
-# Prepare inputs dictionary for ONNX model
-onnx_inputs = {
-    "input_ids": input_ids,
-    "attention_mask": attention_mask,
-    "decoder_input_ids": decoder_input_ids
-}
+    # Add the new token to the generated sequence
+    generated_tokens.append(next_token_id)
 
-# Run the model and get the output
-outputs = sess.run(None, onnx_inputs)
+    # Break if the model predicts the end-of-sequence token
+    if next_token_id == tokenizer.eos_token_id:
+        break
 
-# The output is usually a list of logits from the model
-logits = outputs[0]
+    # Update decoder input for the next step
+    decoder_input_ids = np.concatenate([decoder_input_ids, [[next_token_id]]], axis=1)
 
-# Convert logits to text
-# For simplicity, you can use the tokenizer's `decode` method to extract the summary from the logits
-summary_ids = np.argmax(logits, axis=-1)
-summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+# Decode the generated token IDs into text
+summary = tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
 # Print the summary
 print(summary)

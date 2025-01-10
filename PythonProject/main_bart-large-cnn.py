@@ -2,13 +2,13 @@
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from long_text import LONGTEXT
+from helpers.long_text import GETLONGTEXT
 
 # Load the tokenizer and model
 tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
 
 # Tokenize the input text
-inputs = tokenizer(LONGTEXT, return_tensors="pt")
+inputs = tokenizer(GETLONGTEXT, return_tensors="pt")
 
 model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn")
 print(inputs)

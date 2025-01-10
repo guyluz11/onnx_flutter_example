@@ -4,13 +4,13 @@
 import onnxruntime
 import numpy as np
 from transformers import AutoTokenizer
-from long_text import LONGTEXT
+from helpers.long_text import GETLONGTEXT
 #
 
 import onnx
 
 # Load the model
-model_path = "assets/model/model.onnx"
+model_path = "assets/model/long_t5.onnx"
 model = onnx.load(model_path)
 
 # Check if the model is valid
@@ -21,14 +21,14 @@ print("The model is valid.")
 
 
 # Load ONNX model using onnxruntime
-onnx_model_path = "assets/model/model.onnx"
+onnx_model_path = "assets/model/long_t5.onnx"
 session = onnxruntime.InferenceSession(onnx_model_path)
 
 # Load tokenizer (can be local as mentioned before)
 tokenizer = AutoTokenizer.from_pretrained("assets/bart_tokenizer/")
 
 # Tokenize the input text
-inputs = tokenizer(LONGTEXT, return_tensors="np", padding=True, truncation=True)
+inputs = tokenizer(GETLONGTEXT, return_tensors="np", padding=True, truncation=True)
 
 # Convert inputs to NumPy array for ONNX compatibility
 input_ids = np.array(inputs["input_ids"])
