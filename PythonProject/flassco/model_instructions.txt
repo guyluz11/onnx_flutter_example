@@ -1,0 +1,11 @@
+
+
+From Falconsai
+https://huggingface.co/Falconsai/text_summarization/tree/main/onnx
+
+Download
+https://huggingface.co/Falconsai/text_summarization/blob/main/onnx/encoder_model.onnx
+https://huggingface.co/Falconsai/text_summarization/blob/main/onnx/decoder_model.onnx
+and set the names
+flassco_decoder_model.onnx
+flassco_encoder_model.onnx

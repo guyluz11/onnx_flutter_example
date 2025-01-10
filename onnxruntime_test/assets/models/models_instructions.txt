@@ -1,0 +1,18 @@
+
+From pszemraj
+https://huggingface.co/pszemraj/long-t5-tglobal-base-16384-book-summary/tree/main
+
+Download
+https://huggingface.co/pszemraj/long-t5-tglobal-base-16384-book-summary/blob/main/model.onnx
+set file name long_t5.onnx
+
+
+From Falconsai
+https://huggingface.co/Falconsai/text_summarization/tree/main/onnx
+
+Download
+https://huggingface.co/Falconsai/text_summarization/blob/main/onnx/encoder_model.onnx
+https://huggingface.co/Falconsai/text_summarization/blob/main/onnx/decoder_model.onnx
+and set the names
+flassco_decoder_model.onnx
+flassco_encoder_model.onnx

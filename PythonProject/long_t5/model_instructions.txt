@@ -1,0 +1,7 @@
+
+From pszemraj
+https://huggingface.co/pszemraj/long-t5-tglobal-base-16384-book-summary/tree/main
+
+Download
+https://huggingface.co/pszemraj/long-t5-tglobal-base-16384-book-summary/blob/main/model.onnx
+set file name long_t5.onnx
