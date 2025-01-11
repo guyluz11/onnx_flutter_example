@@ -44,33 +44,53 @@ class _TextSummarizationState extends State<TextSummarization> {
     Tiktoken tiktoken = encodingForModel("t5");
     Uint32List encodedList = tiktoken.encode(text);
 
+    // encodedList = Uint32List.fromList([
+    //   947,
+    //   19,
+    //   3,
+    //   9,
+    //   418,
+    //   13,
+    //   1499,
+    //   27,
+    //   3,
+    //   2029,
+    //   31,
+    //   17,
+    //   241,
+    //   12,
+    //   608,
+    //   3,
+    //   1825,
+    //   58,
+    //   // 1,
+    // ]
+
+    //   [
+    // 947,
+    // 19,
+    // 3,
+    // 9,
+    // 418,
+    // 13,
+    // 1499,
+    // 27,
+    // 3,
+    // 2029,
+    // 31,
+    // 17,
+    // 241,
+    // 12,
+    // 608,
+    // 3,
+    // 1825,
+    // 58
+    // ]
+    // );
+
     print('encodedList');
     print(encodedList);
-    print(tiktoken.decode(encodedList));
-
     List<List<int>> inputList = [encodedList.toList()];
-    // [
-    //   [
-    //     947,
-    //     19,
-    //     3,
-    //     9,
-    //     418,
-    //     13,
-    //     1499,
-    //     27,
-    //     278,
-    //     31,
-    //     17,
-    //     241,
-    //     12,
-    //     608,
-    //     3,
-    //     1825,
-    //     58,
-    //     1,
-    //   ]
-    // ];
 
     List<List<int>> attentionMask = createAttentionMask(inputList);
     // [
@@ -111,13 +131,12 @@ class _TextSummarizationState extends State<TextSummarization> {
     decoderInputIdsOrt.release();
     runOptions.release();
 
-    return null;
     // Post-process the output
-    // String summary = _decodeSummary(outputs);
 
-    // setState(() {
-    //   _summary = summary;
-    // });
+    setState(() {
+      _summary = decodeString;
+    });
+    return null;
   }
 
   List<List<int>> createAttentionMask(List<List<int>> inputList) {
@@ -312,7 +331,7 @@ class _TextSummarizationState extends State<TextSummarization> {
               onPressed: () {
                 String longText =
                     "Here is a lot of text I don't want to read ok?";
-                //                    '''New York (CNN)When Liana Barrientos was 23 years old, she got married in Westchester County, New York.
+                //     '''New York (CNN)When Liana Barrientos was 23 years old, she got married in Westchester County, New York.
                 // A year later, she got married again in Westchester County, but to a different man and without divorcing her first husband.
                 // Only 18 days after that marriage, she got hitched yet again. Then, Barrientos declared "I do" five more times, sometimes only within two weeks of each other.
                 // In 2010, she married once more, this time in the Bronx. In an application for a marriage license, she stated it was her "first and only" marriage.
@@ -325,7 +344,7 @@ class _TextSummarizationState extends State<TextSummarization> {
                 // All occurred either in Westchester County, Long Island, New Jersey or the Bronx. She is believed to still be married to four men, and at one time, she was married to eight men at once, prosecutors say.
                 // Prosecutors said the immigration scam involved some of her husbands, who filed for permanent residence status shortly after the marriages.
                 // Any divorces happened only after such filings were approved. It was unclear whether any of the men will be prosecuted.
-                // The case was referred to the Bronx District Attorney\'s Office by Immigration and Customs Enforcement and the Department of Homeland Security\'s
+                // The case was referred to the Bronx District Attorney's Office by Immigration and Customs Enforcement and the Department of Homeland Security's
                 // Investigation Division. Seven of the men are from so-called "red-flagged" countries, including Egypt, Turkey, Georgia, Pakistan and Mali.
                 // Her eighth husband, Rashid Rajput, was deported in 2006 to his native Pakistan after an investigation by the Joint Terrorism Task Force.
                 // If convicted, Barrientos faces up to four years in prison.  Her next court appearance is scheduled for May 18.
