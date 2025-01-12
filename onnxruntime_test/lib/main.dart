@@ -93,9 +93,7 @@ class _TextSummarizationState extends State<TextSummarization> {
     List<List<int>> inputList = [encodedList.toList()];
 
     List<List<int>> attentionMask = createAttentionMask(inputList);
-    // [
-    //   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    // ];
+
     List<List<int>> decoderInputIds = [
       [0]
     ];

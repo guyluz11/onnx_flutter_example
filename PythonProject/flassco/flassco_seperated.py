@@ -34,7 +34,7 @@ print("EOS Token ID:", tokenizer.eos_token_id)
 # Prepare the input text
 ARTICLE = preprocess_text(GETLONGTEXT)  # Preprocess the text
 # ARTICLE = GETLONGTEXT  # Preprocess the text
-max_summary_length = 500  # Maximum number of tokens for the summary
+max_summary_length = 100  # Maximum number of tokens for the summary
 
 # Tokenize input
 inputs = tokenizer(ARTICLE, return_tensors="pt", padding=True, truncation=True)
@@ -91,6 +91,6 @@ for _ in range(max_summary_length):
         break
 
 # Decode the summarized text
-summarized_text = tokenizer.decode(current_output[0], skip_special_tokens=True)
+summarized_text = tokenizer.decode(current_output[0])
 
 print("Summarized Text:", summarized_text)

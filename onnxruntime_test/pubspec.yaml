@@ -14,7 +14,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   onnxruntime: ^1.4.1
   langchain_tiktoken:
-    path: ../../langchain_tiktoken
+    git:
+      url: https://github.com/guyluz11/langchain_tiktoken.git
+      ref: main
 
 dev_dependencies:
   flutter_test:

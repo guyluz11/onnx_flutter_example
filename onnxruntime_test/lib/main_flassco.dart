@@ -40,11 +40,11 @@ class _TextSummarizationState extends State<TextSummarization> {
 
   Future<String?> summery(String text) async {
     Tiktoken tiktoken = encodingForModel("t5");
-    Uint32List encodedList = tiktoken.encode(text);
+    Uint32List encodedUintList = tiktoken.encode(text);
 
     // print('encodedList');
     // print(encodedList);
-    List<List<int>> inputList = [encodedList.toList()];
+    List<List<int>> inputList = [encodedUintList.toList()];
 
     List<List<int>> attentionMask = createAttentionMask(inputList);
 
@@ -69,7 +69,7 @@ class _TextSummarizationState extends State<TextSummarization> {
     OrtValueTensor encodeOutput =
         OrtValueTensor.createTensorWithDataList(floatOutputs);
 
-    int maxSummaryLength = 500; // Maximum tokens for the summary
+    int maxSummaryLength = 70; // Maximum tokens for the summary
     int eosTokenId = 1; // Example [EOS] token ID (replace with your actual ID)
 
     // print(outputs);
