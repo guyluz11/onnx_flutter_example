@@ -20,45 +20,30 @@ class TextSummarization extends StatefulWidget {
 }
 
 class _TextSummarizationState extends State<TextSummarization> {
-  late OrtSession flasscoEncoderSession;
-  late OrtSession flasscoDecoderSession;
   String _summary = "";
 
-  @override
-  void initState() {
-    super.initState();
-    loadApp();
-  }
-
-  Future<void> loadApp() async {
-    await loadEncoderSession();
-    await loadDecoderSession();
-    String longText = "Here is a lot of text I don't want to read ok?";
-    await flasscoSummarize(getLongText);
-  }
-
-  Future<void> loadDecoderSession() async {
+  Future<OrtSession> loadDecoderSession() async {
     final sessionOptions = OrtSessionOptions();
     const assetFileName = 'assets/models/flassco_decoder_model.onnx';
     final rawAssetFile = await rootBundle.load(assetFileName);
     final bytes = rawAssetFile.buffer.asUint8List();
-    flasscoDecoderSession = OrtSession.fromBuffer(bytes, sessionOptions);
+    return OrtSession.fromBuffer(bytes, sessionOptions);
   }
 
-  Future<void> loadEncoderSession() async {
+  Future<OrtSession> loadEncoderSession() async {
     final sessionOptions = OrtSessionOptions();
     const assetFileName = 'assets/models/flassco_encoder_model.onnx';
     final rawAssetFile = await rootBundle.load(assetFileName);
     final bytes = rawAssetFile.buffer.asUint8List();
-    flasscoEncoderSession = OrtSession.fromBuffer(bytes, sessionOptions);
+    return OrtSession.fromBuffer(bytes, sessionOptions);
   }
 
-  Future<List<OrtValue?>?> summery(String text, OrtSession session) async {
+  Future<String?> summery(String text) async {
     Tiktoken tiktoken = encodingForModel("t5");
     Uint32List encodedList = tiktoken.encode(text);
 
-    print('encodedList');
-    print(encodedList);
+    // print('encodedList');
+    // print(encodedList);
     List<List<int>> inputList = [encodedList.toList()];
 
     List<List<int>> attentionMask = createAttentionMask(inputList);
@@ -72,9 +57,9 @@ class _TextSummarizationState extends State<TextSummarization> {
     List<List<List<double>>>? outputs = await generatEncode(
       attentionMaskOrt: attentionMaskOrt,
       inputOrt: inputOrt,
-      session: flasscoEncoderSession,
       runOptions: runOptions,
     );
+
     if (outputs == null) {
       print('There was error decoding');
       return null;
@@ -84,13 +69,17 @@ class _TextSummarizationState extends State<TextSummarization> {
     OrtValueTensor encodeOutput =
         OrtValueTensor.createTensorWithDataList(floatOutputs);
 
-    print(outputs);
-    List<int>? decodeInts = await generatDecode(
+    int maxSummaryLength = 500; // Maximum tokens for the summary
+    int eosTokenId = 1; // Example [EOS] token ID (replace with your actual ID)
+
+    // print(outputs);
+    List<int>? decodeInts = await generateDecode(
       attentionMaskOrt: attentionMaskOrt,
       inputOrt: inputOrt,
-      session: flasscoDecoderSession,
       runOptions: runOptions,
       encodeOutput: encodeOutput,
+      maxSummaryLength: maxSummaryLength,
+      eosTokenId: eosTokenId,
     );
 
     if (decodeInts == null) {
@@ -98,21 +87,14 @@ class _TextSummarizationState extends State<TextSummarization> {
       return null;
     }
 
-    print(outputs);
     String decodeString = tiktoken.decode(decodeInts);
-
-    print('decodeString');
-    print(decodeString);
 
     inputOrt.release();
     attentionMaskOrt.release();
     runOptions.release();
     encodeOutput.release();
 
-    setState(() {
-      _summary = decodeString;
-    });
-    return null;
+    return decodeString;
   }
 
   /// Helper function to flatten and convert nested List<List<List<double>>> to Float32List
@@ -135,10 +117,8 @@ class _TextSummarizationState extends State<TextSummarization> {
   Future<List<List<List<double>>>?> generatEncode({
     required OrtValueTensor inputOrt,
     required OrtValueTensor attentionMaskOrt,
-    required OrtSession session,
     required OrtRunOptions runOptions,
   }) async {
-    int outputMaxLength = 512;
     List<OrtValue?>? outputs;
 
     final inputs = {
@@ -146,7 +126,10 @@ class _TextSummarizationState extends State<TextSummarization> {
       'attention_mask': attentionMaskOrt,
     };
 
+    print('Start generatEncode');
+    OrtSession session = await loadEncoderSession();
     outputs = await session.runAsync(runOptions, inputs);
+    print('Done generatEncode');
 
     if (outputs == null || outputs.isEmpty) {
       return null;
@@ -158,68 +141,81 @@ class _TextSummarizationState extends State<TextSummarization> {
     }
     List<List<List<double>>> output0Value =
         output0.value as List<List<List<double>>>;
-    // List<int> generatedTokens = [0];
-    // int summaryIds = npArgmax(output0Value[0][output0Value[0].length - 1]);
-    // generatedTokens.add(summaryIds);
 
-    // String summeryText = '';
-    // // summeryText = encoding.decode(summaryIds[0]);
-    //
-    // print('Summery');
-    // print(summeryText);
-    // print('');
-    print('output0Value');
-    print(output0Value);
     outputs.forEach((element) {
       element?.release();
     });
+    session.release();
 
     return output0Value;
   }
 
-  Future<List<int>?> generatDecode({
+  Future<List<int>?> generateDecode({
     required OrtValueTensor inputOrt,
     required OrtValueTensor attentionMaskOrt,
     required OrtValueTensor encodeOutput,
-    required OrtSession session,
     required OrtRunOptions runOptions,
+    required int maxSummaryLength, // Maximum summary length
+    required int eosTokenId, // End-of-sequence token ID
   }) async {
-    List<OrtValue?>? outputs;
+    OrtSession session = await loadDecoderSession();
+    List<int> currentOutput = []; // Stores the generated token IDs
 
-    final inputs = {
-      'input_ids': inputOrt,
-      'encoder_attention_mask': attentionMaskOrt,
-      'encoder_hidden_states': encodeOutput,
-    };
+    // Start with the initial decoder input (e.g., [BOS] token ID)
+    List<int> initialDecoderInput = [
+      inputOrt.value.first[0]
+    ]; // Assuming the first token
+    currentOutput.addAll(initialDecoderInput);
 
-    outputs = await session.runAsync(runOptions, inputs);
+    print('Start generateDecode');
 
-    if (outputs == null || outputs.isEmpty) {
-      return null;
+    // Iterate up to the maximum summary length
+    for (int i = 0; i < maxSummaryLength; i++) {
+      // Prepare inputs for the decoder
+      final inputs = {
+        'input_ids': OrtValueTensor.createTensorWithDataList([currentOutput]),
+        'encoder_attention_mask': attentionMaskOrt,
+        'encoder_hidden_states': encodeOutput,
+      };
+
+      // Run the decoder
+      List<OrtValue?>? outputs = await session.runAsync(runOptions, inputs);
+
+      if (outputs == null || outputs.isEmpty) {
+        print('Decoder outputs are empty!');
+        break;
+      }
+
+      // Extract logits and find the next token
+      OrtValue? output0 = outputs[0];
+      if (output0 == null) {
+        print('Decoder output[0] is null!');
+        break;
+      }
+      List<List<List<double>>> output0Value =
+          output0.value as List<List<List<double>>>;
+      List<int> nextTokenIds = npArgmax(output0Value[0]);
+      int nextTokenId = nextTokenIds.last; // Get the last token ID
+
+      // Append the new token to the current output
+      currentOutput.add(nextTokenId);
+
+      // Release outputs to free resources
+      outputs.forEach((element) {
+        element?.release();
+      });
+
+      // Stop if the [EOS] token is generated
+      if (nextTokenId == eosTokenId) {
+        print('EOS token encountered. Stopping decoding.');
+        break;
+      }
     }
+    print('Done generateDecode');
 
-    OrtValue? output0 = outputs[0];
-    if (output0 == null) {
-      return null;
-    }
-    List<List<List<double>>> output0Value =
-        output0.value as List<List<List<double>>>;
+    session.release();
 
-    print('output0Value');
-    print(output0Value);
-    List<int> summaryIds = npArgmax(output0Value[0]);
-
-    // String summeryText = '';
-    // // summeryText = encoding.decode(summaryIds[0]);
-    //
-    print('summaryIds');
-    print(summaryIds);
-    print('');
-    outputs.forEach((element) {
-      element?.release();
-    });
-
-    return summaryIds;
+    return currentOutput;
   }
 
   List<List<int>> npConcatenate(
@@ -237,17 +233,12 @@ class _TextSummarizationState extends State<TextSummarization> {
   }
 
   Future<void> flasscoSummarize(String inputText) async {
-    List<OrtValue?>? encoderOutput =
-        await summery(inputText, flasscoEncoderSession);
+    String preprocessTextVar = preprocessText(inputText);
+    String? summeryOutput = await summery(inputText);
 
-    // if (encoderOutput?[0] == null) {
-    //   print('No object');
-    //   return;
-    // }
-    // List<OrtValue> nonNullEncoderOutput =
-    //     (encoderOutput ?? []).whereType<OrtValue>().toList();
-    // flasscoDecoder(nonNullEncoderOutput);
-    // print('Done');
+    setState(() {
+      _summary = summeryOutput ?? 'Error summarizing';
+    });
   }
 
   /// Using axis -1
@@ -269,6 +260,22 @@ class _TextSummarizationState extends State<TextSummarization> {
     }
 
     return maxIndices;
+  }
+
+  String preprocessText(String text) {
+    // Remove consecutive punctuation (e.g., `...,`)
+    text = text.replaceAll(RegExp(r'[,.]{2,}'), ' ');
+
+    // Remove extra spaces
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    // Remove non-ASCII characters
+    text = text.replaceAll(RegExp(r'[^\x00-\x7F]+'), ' ');
+
+    // Lowercase the text (optional)
+    text = text.toLowerCase();
+
+    return text;
   }
 
   @override
@@ -295,29 +302,7 @@ class _TextSummarizationState extends State<TextSummarization> {
             ),
             SizedBox(height: 20),
             TextButton(
-              onPressed: () {
-                String longText =
-                    "Here is a lot of text I don't want to read ok?";
-                //     '''New York (CNN)When Liana Barrientos was 23 years old, she got married in Westchester County, New York.
-                // A year later, she got married again in Westchester County, but to a different man and without divorcing her first husband.
-                // Only 18 days after that marriage, she got hitched yet again. Then, Barrientos declared "I do" five more times, sometimes only within two weeks of each other.
-                // In 2010, she married once more, this time in the Bronx. In an application for a marriage license, she stated it was her "first and only" marriage.
-                // Barrientos, now 39, is facing two criminal counts of "offering a false instrument for filing in the first degree," referring to her false statements on the
-                // 2010 marriage license application, according to court documents.
-                // Prosecutors said the marriages were part of an immigration scam.
-                // On Friday, she pleaded not guilty at State Supreme Court in the Bronx, according to her attorney, Christopher Wright, who declined to comment further.
-                // After leaving court, Barrientos was arrested and charged with theft of service and criminal trespass for allegedly sneaking into the New York subway through an emergency exit, said Detective
-                // Annette Markowski, a police spokeswoman. In total, Barrientos has been married 10 times, with nine of her marriages occurring between 1999 and 2002.
-                // All occurred either in Westchester County, Long Island, New Jersey or the Bronx. She is believed to still be married to four men, and at one time, she was married to eight men at once, prosecutors say.
-                // Prosecutors said the immigration scam involved some of her husbands, who filed for permanent residence status shortly after the marriages.
-                // Any divorces happened only after such filings were approved. It was unclear whether any of the men will be prosecuted.
-                // The case was referred to the Bronx District Attorney's Office by Immigration and Customs Enforcement and the Department of Homeland Security's
-                // Investigation Division. Seven of the men are from so-called "red-flagged" countries, including Egypt, Turkey, Georgia, Pakistan and Mali.
-                // Her eighth husband, Rashid Rajput, was deported in 2006 to his native Pakistan after an investigation by the Joint Terrorism Task Force.
-                // If convicted, Barrientos faces up to four years in prison.  Her next court appearance is scheduled for May 18.
-                // ''';
-                flasscoSummarize(longText);
-              },
+              onPressed: () => flasscoSummarize(getLongText),
               child: Text('Press to impress'),
             ),
             SizedBox(height: 20),
